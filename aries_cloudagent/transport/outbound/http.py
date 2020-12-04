@@ -11,6 +11,7 @@ from ..stats import StatsTracer
 
 from .base import BaseOutboundTransport, OutboundTransportError
 
+import traceback
 
 class HttpTransport(BaseOutboundTransport):
     """Http outbound transport class."""
@@ -63,13 +64,27 @@ class HttpTransport(BaseOutboundTransport):
         self.logger.debug(
             "Posting to %s; Data: %s; Headers: %s", endpoint, payload, headers
         )
-        async with self.client_session.post(
-            endpoint, data=payload, headers=headers
-        ) as response:
-            if response.status < 200 or response.status > 299:
+        try:
+            response = await self.client_session.post(
+                endpoint, data=payload, headers=headers
+            )
+
+            if response:
+                self.logger.debug("response status is " + str(response.status))
+                if response.status < 200 or response.status > 299:
+                    raise OutboundTransportError(
+                        (
+                            f"Unexpected response status {response.status}, "
+                            f"caused by: {response.reason}"
+                        )
+                    )
+            else:
                 raise OutboundTransportError(
                     (
-                        f"Unexpected response status {response.status}, "
-                        f"caused by: {response.reason}"
+                        f"Unexpected empty response, "
+                        f"caused by unknown error"
                     )
                 )
+        except:
+            self.logger.debug("caught exception on client_session POST")
+            traceback.print_exc()
